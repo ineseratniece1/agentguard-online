@@ -2,8 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AgentGuard Website Audit</title>
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             margin: 0;
             font-family: Arial, sans-serif;
@@ -11,176 +16,325 @@
             color: #f5f5f5;
         }
 
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 60px 24px;
-        }
-
-        .badge {
-            display: inline-block;
-            background: #063f2b;
-            color: #39e58c;
-            padding: 8px 14px;
-            border-radius: 999px;
-            font-size: 14px;
-            margin-bottom: 24px;
-        }
-
-        h1 {
-            font-size: 54px;
-            line-height: 1.05;
-            margin: 0 0 20px;
-        }
-
-        p {
-            color: #b5b5b5;
-            font-size: 18px;
-            line-height: 1.6;
+        .page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
         }
 
         .card {
+            width: 100%;
+            max-width: 760px;
             background: #111;
             border: 1px solid #262626;
-            border-radius: 22px;
-            padding: 28px;
-            margin-top: 36px;
+            border-radius: 24px;
+            padding: 34px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+        }
+
+        .logo-row {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+
+        .logo-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, #39e58c, #1fb8ff);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #050505;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .logo-text h1 {
+            margin: 0;
+            font-size: 34px;
+            line-height: 1.1;
+        }
+
+        .logo-text p {
+            margin: 6px 0 0;
+            color: #bdbdbd;
+            font-size: 15px;
+        }
+
+        .hero {
+            margin: 24px 0 30px;
+        }
+
+        .hero h2 {
+            margin: 0 0 10px;
+            font-size: 28px;
+            line-height: 1.2;
+        }
+
+        .hero p {
+            margin: 0;
+            color: #bdbdbd;
+            line-height: 1.6;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+            font-size: 15px;
+        }
+
+        .input-wrap {
+            margin-bottom: 20px;
         }
 
         input[type="text"] {
             width: 100%;
-            padding: 18px;
-            border-radius: 14px;
+            padding: 16px 18px;
+            border-radius: 16px;
             border: 1px solid #333;
-            background: #050505;
-            color: white;
+            background: #0b0b0b;
+            color: #fff;
             font-size: 16px;
-            box-sizing: border-box;
+            outline: none;
+        }
+
+        input[type="text"]:focus {
+            border-color: #39e58c;
         }
 
         .options {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: 1fr;
             gap: 14px;
-            margin-top: 18px;
+            margin: 22px 0 28px;
         }
 
-        label {
-            background: #181818;
-            border: 1px solid #2b2b2b;
-            border-radius: 14px;
+        .option {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            background: #0b0b0b;
+            border: 1px solid #262626;
+            border-radius: 16px;
             padding: 16px;
+        }
+
+        .option input {
+            margin-top: 4px;
+            transform: scale(1.15);
+        }
+
+        .option strong {
             display: block;
-            cursor: pointer;
+            margin-bottom: 4px;
+            font-size: 15px;
+        }
+
+        .option small {
+            color: #bdbdbd;
+            line-height: 1.5;
         }
 
         button {
-            margin-top: 22px;
+            width: 100%;
+            padding: 16px 18px;
+            border: none;
+            border-radius: 16px;
             background: #39e58c;
             color: #050505;
-            border: none;
-            border-radius: 14px;
-            padding: 17px 24px;
-            font-size: 16px;
+            font-size: 17px;
             font-weight: bold;
             cursor: pointer;
+            transition: 0.2s ease;
         }
 
         button:hover {
-            background: #6affaa;
+            transform: translateY(-1px);
+            opacity: 0.96;
         }
 
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 18px;
-            margin-top: 32px;
+        .mini-note {
+            margin-top: 18px;
+            font-size: 13px;
+            color: #9e9e9e;
+            line-height: 1.5;
         }
 
-        .feature {
-            background: #101010;
-            border: 1px solid #252525;
-            border-radius: 18px;
-            padding: 22px;
+        .mini-note strong {
+            color: #f5f5f5;
         }
 
-        .feature h3 {
-            margin-top: 0;
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(5, 5, 5, 0.92);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            text-align: center;
+            padding: 20px;
         }
 
-        @media (max-width: 800px) {
-            h1 {
-                font-size: 38px;
+        .loading-overlay.show {
+            display: flex;
+        }
+
+        .spinner {
+            width: 70px;
+            height: 70px;
+            border: 6px solid #1c1c1c;
+            border-top: 6px solid #39e58c;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 24px;
+        }
+
+        .loading-overlay h3 {
+            margin: 0 0 10px;
+            font-size: 28px;
+        }
+
+        .loading-overlay p {
+            margin: 0;
+            color: #bdbdbd;
+            line-height: 1.6;
+            max-width: 420px;
+        }
+
+        .scan-dots {
+            margin-top: 18px;
+            color: #39e58c;
+            font-weight: bold;
+            letter-spacing: 3px;
+            animation: pulse 1.2s infinite;
+        }
+
+        @keyframes spin {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.2; }
+            50% { opacity: 1; }
+            100% { opacity: 0.2; }
+        }
+
+        @media (max-width: 640px) {
+            .card {
+                padding: 24px;
             }
 
-            .options,
-            .grid {
-                grid-template-columns: 1fr;
+            .logo-text h1 {
+                font-size: 28px;
+            }
+
+            .hero h2 {
+                font-size: 24px;
             }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="badge">CyberStart final prototype</div>
-
-        <h1>AgentGuard Website Audit</h1>
-
-        <p>
-            A simple tool that combines classic website safety checks with AI-agent exposure checks.
-            It helps website owners understand headers, cookies, forms, scripts, chatbots, hidden prompt-like text,
-            and AI policy files such as llms.txt.
-        </p>
-
+    <div class="page">
         <div class="card">
-            <h2>Run website audit</h2>
+            <div class="logo-row">
+                <div class="logo-icon">AG</div>
+                <div class="logo-text">
+                    <h1>AgentGuard</h1>
+                    <p>Website Security and AI Exposure Audit</p>
+                </div>
+            </div>
 
-            <form action="/scan" method="post">
-                <input type="text" name="url" value="https://www.janisratnieks.com/" placeholder="Enter website URL">
+            <div class="hero">
+                <h2>Scan a website for basic security and AI-related exposure signals</h2>
+                <p>
+                    AgentGuard checks visible website security basics, AI-related policy files,
+                    public exposure indicators, and permission-controlled active checks.
+                </p>
+            </div>
+
+            <form id="auditForm" action="/scan" method="POST">
+                <div class="input-wrap">
+                    <label for="url">Website URL</label>
+                    <input
+                        type="text"
+                        id="url"
+                        name="url"
+                        placeholder="https://example.com"
+                        required
+                    >
+                </div>
 
                 <div class="options">
-                    <label>
-                        <input type="checkbox" name="passive" checked>
-                        Passive audit
-                        <br>
-                        <small>Safe public checks</small>
+                    <label class="option">
+                        <input type="checkbox" checked disabled>
+                        <div>
+                            <strong>Passive audit</strong>
+                            <small>
+                                Safe default scan using public website responses, headers, scripts,
+                                cookies, forms, robots.txt, llms.txt, and other visible signals.
+                            </small>
+                        </div>
                     </label>
 
-                    <label>
+                    <label class="option">
                         <input type="checkbox" name="active">
-                        Active audit
-                        <br>
-                        <small>Light checks with permission</small>
+                        <div>
+                            <strong>Active audit</strong>
+                            <small>
+                                Light active checks for common public paths. Only use on sites you own
+                                or have permission to test.
+                            </small>
+                        </div>
                     </label>
 
-                    <label>
+                    <label class="option">
                         <input type="checkbox" name="permission">
-                        I have permission
-                        <br>
-                        <small>Required for active mode</small>
+                        <div>
+                            <strong>I have permission</strong>
+                            <small>
+                                Required before active audit is allowed.
+                            </small>
+                        </div>
                     </label>
                 </div>
 
-                <button type="submit">Run audit</button>
+                <button type="submit">Run AgentGuard Audit</button>
+
+                <p class="mini-note">
+                    <strong>Note:</strong> This prototype does not brute-force passwords, exploit vulnerabilities,
+                    or stress test the website.
+                </p>
             </form>
         </div>
-
-        <div class="grid">
-            <div class="feature">
-                <h3>Classic security</h3>
-                <p>Checks HTTPS, security headers, cookies, forms, mixed content, and exposed technology.</p>
-            </div>
-
-            <div class="feature">
-                <h3>AI exposure</h3>
-                <p>Looks for chatbot scripts, third-party scripts, hidden prompt-like text, llms.txt, and robots.txt.</p>
-            </div>
-
-            <div class="feature">
-                <h3>Plain-English report</h3>
-                <p>Explains what was found, why it matters, and what should be fixed first.</p>
-            </div>
-        </div>
     </div>
+
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <h3>Scanning website</h3>
+        <p>
+            AgentGuard is running the audit now. This may take a few seconds depending on the website.
+        </p>
+        <div class="scan-dots">● ● ●</div>
+    </div>
+
+    <script>
+        const form = document.getElementById('auditForm');
+        const overlay = document.getElementById('loadingOverlay');
+
+        form.addEventListener('submit', function () {
+            overlay.classList.add('show');
+        });
+    </script>
 </body>
 </html>

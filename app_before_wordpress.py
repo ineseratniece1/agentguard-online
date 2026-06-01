@@ -3,35 +3,8 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 from html import escape
-import re
 
 app = Flask(__name__)
-
-
-BROWSER_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36 AgentGuardPrototype/1.0",
-    "Accept": "text/html,text/plain,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Cache-Control": "no-cache",
-    "Connection": "close"
-}
-
-def safe_get(url, **kwargs):
-    timeout = kwargs.pop("timeout", 10)
-    allow_redirects = kwargs.pop("allow_redirects", True)
-    headers = kwargs.pop("headers", {}) or {}
-
-    merged_headers = BROWSER_HEADERS.copy()
-    merged_headers.update(headers)
-
-    return requests.get(
-        url,
-        timeout=timeout,
-        allow_redirects=allow_redirects,
-        headers=merged_headers,
-        **kwargs
-    )
-
 
 SECURITY_HEADERS = [
     "Strict-Transport-Security",
@@ -74,8 +47,7 @@ ACTIVE_PATHS = [
     "/phpinfo.php",
     "/server-status",
     "/wp-login.php",
-    "/xmlrpc.php",
-    "/wp-json/wp/v2/users"
+    "/xmlrpc.php"
 ]
 
 
@@ -92,7 +64,7 @@ def get_domain(url):
 
 def check_policy_file(base_url, path):
     try:
-        r = safe_get(urljoin(base_url, path), timeout=8)
+        r = requests.get(urljoin(base_url, path), timeout=8)
         return r.status_code == 200
     except Exception:
         return False
@@ -114,7 +86,7 @@ def run_passive_audit(url):
     url = normalize_url(url)
 
     try:
-        response = safe_get(
+        response = requests.get(
             url,
             timeout=12,
             allow_redirects=True,
@@ -296,99 +268,11 @@ def run_passive_audit(url):
             "Add a clean llms.txt file to guide AI assistants to important pages."
         )
 
-    wordpress_result = run_wordpress_passive_checks(response, final_url, base_url, soup)
-    facts.update(wordpress_result["facts"])
-    findings.extend(wordpress_result["findings"])
-
     return {
         "facts": facts,
         "findings": findings,
         "final_url": final_url,
         "base_url": base_url
-    }
-
-
-
-def run_wordpress_passive_checks(response, final_url, base_url, soup):
-    findings = []
-    facts = {}
-
-    html = response.text or ""
-    lower_html = html.lower()
-
-    wp_json_found = False
-    try:
-        wp_json_response = safe_get(
-            urljoin(base_url, "/wp-json/"),
-            timeout=8,
-            headers={"User-Agent": "AgentGuardPrototype/1.0"}
-        )
-        wp_json_found = wp_json_response.status_code == 200
-    except Exception:
-        wp_json_found = False
-
-    generator = soup.find("meta", attrs={"name": "generator"})
-    generator_content = generator.get("content", "") if generator else ""
-
-    theme_names = sorted(set(
-        re.findall(r"/wp-content/themes/([^/\"'?#]+)", html, re.IGNORECASE)
-    ))
-
-    plugin_names = sorted(set(
-        re.findall(r"/wp-content/plugins/([^/\"'?#]+)", html, re.IGNORECASE)
-    ))
-
-    wordpress_detected = (
-        "wp-content" in lower_html
-        or "wp-includes" in lower_html
-        or "wordpress" in lower_html
-        or wp_json_found
-    )
-
-    facts["WordPress detected"] = "Yes" if wordpress_detected else "No"
-    facts["WordPress REST API"] = "Found" if wp_json_found else "Not found"
-    facts["WordPress theme indicators"] = ", ".join(theme_names[:5]) if theme_names else "None found"
-    facts["WordPress plugin indicators"] = f"{len(plugin_names)} found" if plugin_names else "None found"
-
-    if wordpress_detected:
-        add_finding(
-            findings,
-            "Info",
-            "WordPress site detected",
-            "Public WordPress indicators were found.",
-            "Keep WordPress core, themes, and plugins updated. Use MFA and login rate limiting."
-        )
-
-    if generator_content and "wordpress" in generator_content.lower():
-        add_finding(
-            findings,
-            "Low",
-            "WordPress generator tag exposed",
-            f"Generator meta tag: {generator_content}",
-            "Remove public generator/version tags where possible."
-        )
-
-    if theme_names:
-        add_finding(
-            findings,
-            "Low",
-            "WordPress theme name visible",
-            f"Detected theme indicator: {theme_names[0]}",
-            "This is common, but outdated themes can be risky. Keep the active theme updated."
-        )
-
-    if plugin_names:
-        add_finding(
-            findings,
-            "Low",
-            "WordPress plugin names visible",
-            f"Detected {len(plugin_names)} plugin indicator(s).",
-            "Review visible plugins and keep them updated. Remove plugins that are no longer needed."
-        )
-
-    return {
-        "facts": facts,
-        "findings": findings
     }
 
 
@@ -412,7 +296,7 @@ def run_active_audit(base_url):
         full_url = urljoin(base_url, path)
 
         try:
-            r = safe_get(
+            r = requests.get(
                 full_url,
                 timeout=8,
                 allow_redirects=True,
@@ -480,16 +364,6 @@ def run_active_audit(base_url):
                         "WordPress XML-RPC endpoint detected",
                         f"/xmlrpc.php returned HTTP {r.status_code}.",
                         "Disable XML-RPC if the site does not need it. Otherwise, rate-limit and monitor it."
-                    )
-
-            if path == "/wp-json/wp/v2/users":
-                if r.status_code == 200 and body_sample.strip().startswith("[") and ("slug" in body_sample or "avatar_urls" in body_sample or '"name"' in body_sample):
-                    add_finding(
-                        findings,
-                        "Medium",
-                        "Possible WordPress user enumeration via REST API",
-                        "/wp-json/wp/v2/users returned a public users-style response.",
-                        "If public author data is not needed, restrict this endpoint or reduce exposed user information."
                     )
 
         except Exception as e:
@@ -605,60 +479,6 @@ def scan():
                 color: #39e58c;
             }}
 
-            .result-actions {{
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                gap: 14px;
-                margin-bottom: 24px;
-            }}
-
-            .print-btn {{
-                background: #39e58c;
-                color: #050505;
-                border: none;
-                border-radius: 12px;
-                padding: 12px 16px;
-                font-weight: bold;
-                cursor: pointer;
-            }}
-
-            .safety-note {{
-                background: #0f1f17;
-                border: 1px solid #1f6b46;
-                color: #d7ffe9;
-                border-radius: 16px;
-                padding: 18px;
-                line-height: 1.6;
-                margin-bottom: 28px;
-            }}
-
-            @media print {{
-                body {{
-                    background: white;
-                    color: black;
-                }}
-
-                .result-actions,
-                .print-btn {{
-                    display: none;
-                }}
-
-                .score, .fact, .finding, .safety-note {{
-                    background: white;
-                    color: black;
-                    border: 1px solid #ccc;
-                }}
-
-                .score-number {{
-                    color: black;
-                }}
-
-                a {{
-                    color: black;
-                }}
-            }}
-
             .top {{
                 display: grid;
                 grid-template-columns: repeat(3, 1fr);
@@ -709,14 +529,7 @@ def scan():
     </head>
     <body>
         <div class="container">
-            <div class="result-actions">
-                <a href="/">← Run another audit</a>
-                <button onclick="window.print()" class="print-btn">Print / Save report</button>
-            </div>
-
-            <div class="safety-note">
-                <strong>Scan safety:</strong> Passive audit reviews public website signals. Active audit only checks a small list of common public paths when permission is confirmed. This prototype does not brute-force passwords, exploit vulnerabilities, submit forms, or stress test the website.
-            </div>
+            <p><a href="/">← Run another audit</a></p>
 
             <h1>AgentGuard Audit Results</h1>
             <p>Website tested: <strong>{escape(url)}</strong></p>
