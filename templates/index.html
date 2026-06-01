@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AgentGuard Website Audit</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #050505;
+            color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 60px 24px;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #063f2b;
+            color: #39e58c;
+            padding: 8px 14px;
+            border-radius: 999px;
+            font-size: 14px;
+            margin-bottom: 24px;
+        }
+
+        h1 {
+            font-size: 54px;
+            line-height: 1.05;
+            margin: 0 0 20px;
+        }
+
+        p {
+            color: #b5b5b5;
+            font-size: 18px;
+            line-height: 1.6;
+        }
+
+        .card {
+            background: #111;
+            border: 1px solid #262626;
+            border-radius: 22px;
+            padding: 28px;
+            margin-top: 36px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 18px;
+            border-radius: 14px;
+            border: 1px solid #333;
+            background: #050505;
+            color: white;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+
+        .options {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+            margin-top: 18px;
+        }
+
+        label {
+            background: #181818;
+            border: 1px solid #2b2b2b;
+            border-radius: 14px;
+            padding: 16px;
+            display: block;
+            cursor: pointer;
+        }
+
+        button {
+            margin-top: 22px;
+            background: #39e58c;
+            color: #050505;
+            border: none;
+            border-radius: 14px;
+            padding: 17px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #6affaa;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 18px;
+            margin-top: 32px;
+        }
+
+        .feature {
+            background: #101010;
+            border: 1px solid #252525;
+            border-radius: 18px;
+            padding: 22px;
+        }
+
+        .feature h3 {
+            margin-top: 0;
+        }
+
+        @media (max-width: 800px) {
+            h1 {
+                font-size: 38px;
+            }
+
+            .options,
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="badge">CyberStart final prototype</div>
+
+        <h1>AgentGuard Website Audit</h1>
+
+        <p>
+            A simple tool that combines classic website safety checks with AI-agent exposure checks.
+            It helps website owners understand headers, cookies, forms, scripts, chatbots, hidden prompt-like text,
+            and AI policy files such as llms.txt.
+        </p>
+
+        <div class="card">
+            <h2>Run website audit</h2>
+
+            <form action="/scan" method="post">
+                <input type="text" name="url" value="https://www.janisratnieks.com/" placeholder="Enter website URL">
+
+                <div class="options">
+                    <label>
+                        <input type="checkbox" name="passive" checked>
+                        Passive audit
+                        <br>
+                        <small>Safe public checks</small>
+                    </label>
+
+                    <label>
+                        <input type="checkbox" name="active">
+                        Active audit
+                        <br>
+                        <small>Light checks with permission</small>
+                    </label>
+
+                    <label>
+                        <input type="checkbox" name="permission">
+                        I have permission
+                        <br>
+                        <small>Required for active mode</small>
+                    </label>
+                </div>
+
+                <button type="submit">Run audit</button>
+            </form>
+        </div>
+
+        <div class="grid">
+            <div class="feature">
+                <h3>Classic security</h3>
+                <p>Checks HTTPS, security headers, cookies, forms, mixed content, and exposed technology.</p>
+            </div>
+
+            <div class="feature">
+                <h3>AI exposure</h3>
+                <p>Looks for chatbot scripts, third-party scripts, hidden prompt-like text, llms.txt, and robots.txt.</p>
+            </div>
+
+            <div class="feature">
+                <h3>Plain-English report</h3>
+                <p>Explains what was found, why it matters, and what should be fixed first.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
