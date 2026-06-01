@@ -116,20 +116,24 @@ def run_passive_audit(url):
     try:
         response = safe_get(
             url,
-            timeout=12,
+            timeout=25,
             allow_redirects=True,
             headers={"User-Agent": "AgentGuardPrototype/1.0"}
         )
     except Exception as e:
         return {
+            "audit_incomplete": True,
             "score": 0,
-            "risk": "Critical",
-            "facts": {"Error": str(e)},
+            "risk": "Audit incomplete",
+            "facts": {
+                "Audit status": "Incomplete",
+                "Error": str(e)
+            },
             "findings": [{
                 "severity": "Critical",
                 "title": "Could not reach website",
                 "evidence": str(e),
-                "fix": "Check that the website URL is correct and online."
+                "fix": "The website may be blocking automated requests, responding too slowly, or protected by CDN/WAF rules. Try again later or test a smaller page."
             }]
         }
 
@@ -554,13 +558,17 @@ def scan():
     facts = passive_result["facts"]
     findings = passive_result["findings"]
 
-    if active and permission:
-        active_result = run_active_audit(passive_result["base_url"])
-        facts.update(active_result["facts"])
-        findings.extend(active_result["findings"])
+    if passive_result.get("audit_incomplete"):
+        score = "N/A"
+        risk = "Audit incomplete"
+    else:
+        if active and permission:
+            active_result = run_active_audit(passive_result["base_url"])
+            facts.update(active_result["facts"])
+            findings.extend(active_result["findings"])
 
-    score = calculate_score(findings)
-    risk = get_risk(score)
+        score = calculate_score(findings)
+        risk = get_risk(score)
 
     facts_html = ""
     for key, value in facts.items():
@@ -581,6 +589,7 @@ def scan():
         findings_html = "<p>No obvious issues found in this prototype scan.</p>"
 
     audit_mode = "Passive + Active" if active and permission else "Passive"
+    score_display = f"{score}/100" if isinstance(score, int) else score
 
     return f"""
     <!DOCTYPE html>
@@ -724,7 +733,7 @@ def scan():
             <div class="top">
                 <div class="score">
                     <p>Safety score</p>
-                    <div class="score-number">{score}/100</div>
+                    <div class="score-number">{score_display}</div>
                 </div>
 
                 <div class="score">
