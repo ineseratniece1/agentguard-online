@@ -4,8 +4,30 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 from html import escape
 import re
+import ipaddress  # FIX 1: needed for SSRF protection
 
 app = Flask(__name__)
+
+# ─────────────────────────────────────────────
+# FIX 2: Simple in-memory rate limiting
+# Limits each IP to 10 scans per 60 seconds
+# ─────────────────────────────────────────────
+import time
+from collections import defaultdict
+
+RATE_LIMIT_WINDOW = 60   # seconds
+RATE_LIMIT_MAX    = 10   # requests per window
+_rate_store = defaultdict(list)
+
+def is_rate_limited(ip):
+    now = time.time()
+    timestamps = _rate_store[ip]
+    # drop old entries outside the window
+    _rate_store[ip] = [t for t in timestamps if now - t < RATE_LIMIT_WINDOW]
+    if len(_rate_store[ip]) >= RATE_LIMIT_MAX:
+        return True
+    _rate_store[ip].append(now)
+    return False
 
 
 BROWSER_HEADERS = {
@@ -86,6 +108,43 @@ def normalize_url(url):
     return url
 
 
+# ─────────────────────────────────────────────
+# FIX 1: SSRF protection
+# Blocks private IPs, localhost, and cloud
+# metadata endpoints before making any request
+# ─────────────────────────────────────────────
+BLOCKED_HOSTNAMES = {
+    "localhost",
+    "127.0.0.1",
+    "0.0.0.0",
+    "169.254.169.254",   # AWS/GCP/Azure metadata
+    "metadata.google.internal",
+}
+
+def is_safe_url(url):
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+        if hostname.lower() in BLOCKED_HOSTNAMES:
+            return False
+        # If the hostname is a raw IP address, check if it is private
+        try:
+            ip = ipaddress.ip_address(hostname)
+            if (ip.is_private or ip.is_loopback or
+                    ip.is_link_local or ip.is_reserved or
+                    ip.is_multicast):
+                return False
+        except ValueError:
+            pass  # normal hostname like "example.com" — fine
+        return True
+    except Exception:
+        return False
+
+
 def get_domain(url):
     return urlparse(url).netloc.replace("www.", "").lower()
 
@@ -112,6 +171,21 @@ def run_passive_audit(url):
     facts = {}
 
     url = normalize_url(url)
+
+    # FIX 1: Block SSRF attempts before making any request
+    if not is_safe_url(url):
+        return {
+            "audit_incomplete": True,
+            "score": 0,
+            "risk": "Blocked",
+            "facts": {"Audit status": "Blocked — unsafe URL"},
+            "findings": [{
+                "severity": "Critical",
+                "title": "URL blocked for safety",
+                "evidence": url,
+                "fix": "Only public website URLs are allowed. Private IPs, localhost, and internal addresses are blocked."
+            }]
+        }
 
     try:
         response = safe_get(
@@ -183,6 +257,7 @@ def run_passive_audit(url):
     facts["Cookies detected"] = len(response.cookies)
 
     for cookie in response.cookies:
+        # FIX 3a: Check Secure flag
         if not cookie.secure and final_url.startswith("https://"):
             add_finding(
                 findings,
@@ -191,6 +266,25 @@ def run_passive_audit(url):
                 f"Cookie name: {cookie.name}",
                 "Add the Secure flag to cookies that should only be sent over HTTPS."
             )
+        # FIX 3b: Check HttpOnly flag
+        cookie_attrs = {k.lower() for k in (cookie._rest or {})}
+        if "httponly" not in cookie_attrs:
+            add_finding(
+                findings,
+                "Medium",
+                "Cookie missing HttpOnly flag",
+                f"Cookie name: {cookie.name}",
+                "Add the HttpOnly flag to prevent JavaScript from accessing this cookie."
+            )
+        # FIX 3c: Check SameSite flag
+        if "samesite" not in cookie_attrs:
+            add_finding(
+                findings,
+                "Low",
+                "Cookie missing SameSite flag",
+                f"Cookie name: {cookie.name}",
+                "Add SameSite=Lax or SameSite=Strict to protect against CSRF attacks."
+            )
 
     soup = BeautifulSoup(response.text, "html.parser")
 
@@ -198,6 +292,9 @@ def run_passive_audit(url):
     external_scripts = []
     tracking_scripts = []
     chatbot_scripts = []
+
+    # FIX 4: Check for missing Subresource Integrity (SRI) on external scripts
+    missing_sri = []
 
     for script in soup.find_all("script"):
         src = script.get("src")
@@ -211,6 +308,9 @@ def run_passive_audit(url):
 
         if script_domain and script_domain != page_domain:
             external_scripts.append(full_src)
+            # FIX 4: Flag external scripts without integrity attribute
+            if not script.get("integrity"):
+                missing_sri.append(full_src)
 
         lower_src = full_src.lower()
 
@@ -226,6 +326,17 @@ def run_passive_audit(url):
     facts["External script domains"] = len(external_domains)
     facts["Tracking scripts"] = len(tracking_scripts)
     facts["AI/chatbot indicators"] = len(chatbot_scripts)
+    facts["External scripts missing SRI"] = len(missing_sri)  # FIX 4
+
+    # FIX 4: Report missing SRI
+    if missing_sri:
+        add_finding(
+            findings,
+            "Medium",
+            "External scripts loaded without Subresource Integrity (SRI)",
+            f"{len(missing_sri)} external script(s) have no integrity= attribute.",
+            "Add integrity and crossorigin attributes to external <script> tags so the browser rejects tampered files."
+        )
 
     if len(external_domains) >= 8:
         add_finding(
@@ -310,7 +421,6 @@ def run_passive_audit(url):
         "final_url": final_url,
         "base_url": base_url
     }
-
 
 
 def run_wordpress_passive_checks(response, final_url, base_url, soup):
@@ -536,6 +646,16 @@ def get_risk(score):
         return "Critical"
 
 
+# FIX 5: Colour-coded severity badges
+SEVERITY_STYLES = {
+    "Critical": "background:#3d0000; color:#ff6b6b;",
+    "High":     "background:#2b1400; color:#ff9f43;",
+    "Medium":   "background:#2b1f00; color:#ffd36a;",
+    "Low":      "background:#001a2b; color:#74b9ff;",
+    "Info":     "background:#0d1f0d; color:#55efc4;",
+}
+
+
 @app.route("/")
 def home():
     return render_template("index.html")
@@ -543,7 +663,25 @@ def home():
 
 @app.route("/scan", methods=["POST"])
 def scan():
-    url = request.form.get("url", "")
+    # FIX 2: Rate limiting check
+    client_ip = request.remote_addr or "unknown"
+    if is_rate_limited(client_ip):
+        return """
+        <h1>Too many requests</h1>
+        <p>You have made too many scan requests. Please wait a minute and try again.</p>
+        <p><a href="/">Go back</a></p>
+        """, 429
+
+    url = request.form.get("url", "").strip()
+
+    # Basic empty-input guard
+    if not url:
+        return """
+        <h1>No URL provided</h1>
+        <p>Please enter a website URL to scan.</p>
+        <p><a href="/">Go back</a></p>
+        """
+
     active = "active" in request.form
     permission = "permission" in request.form
 
@@ -560,7 +698,7 @@ def scan():
 
     if passive_result.get("audit_incomplete"):
         score = "N/A"
-        risk = "Audit incomplete"
+        risk = passive_result.get("risk", "Audit incomplete")
     else:
         if active and permission:
             active_result = run_active_audit(passive_result["base_url"])
@@ -576,9 +714,12 @@ def scan():
 
     findings_html = ""
     for finding in findings:
+        # FIX 5: Use colour-coded severity style
+        sev = finding["severity"]
+        sev_style = SEVERITY_STYLES.get(sev, "background:#222; color:#fff;")
         findings_html += f"""
         <div class="finding">
-            <span class="severity">{escape(finding["severity"])}</span>
+            <span class="severity" style="{sev_style}">{escape(sev)}</span>
             <h3>{escape(finding["title"])}</h3>
             <p><strong>Evidence:</strong> {escape(finding["evidence"])}</p>
             <p><strong>Recommended fix:</strong> {escape(finding["fix"])}</p>
@@ -701,8 +842,6 @@ def scan():
 
             .severity {{
                 display: inline-block;
-                background: #2b1f00;
-                color: #ffd36a;
                 padding: 6px 10px;
                 border-radius: 999px;
                 font-size: 13px;
